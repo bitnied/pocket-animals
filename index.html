@@ -111,9 +111,32 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":21934636,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":21999824,"index.wasm":37685705},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
+const partesDoJogo = [["be10168722d1a80cafa5a9098ae56622d253bb87a560d3d0c4c5f35944cf5554.bin", 3145728], ["a0f3264204db1f17276f6f3c5df21148d33d3b542e5a640700ea76f08588dd02.bin", 3145728], ["2b96b8c28776ea29d46367eab6b70f218598cb334b6739c0428fcadd61bd276e.bin", 3145728], ["59503b6e2bd64808cd180c475527237f41d5264abe5dcaa287dcd24c55657ef9.bin", 3145728], ["af7331e6a4a2b82cf18f5235348d9fe697a344dd5279e532604f82370882105a.bin", 3145728], ["613e2dd71e671ffef0010515e8038f309d365201a8a4e6ecee48322c8e0fb8dd.bin", 3145728], ["bf8e6e1325ea88af7f0230e2f846ef979c86aca1a398b4051d3a3e9d109b474a.bin", 3125456]];
+// Recebe a mesma exportação testada localmente em blocos estáticos.
+async function iniciarPocketAnimals({ onProgress }) {
+	const size = GODOT_CONFIG.fileSizes["index.pck"];
+	const pack = new Uint8Array(size);
+	async function carregarPartes() {
+		let offset = 0;
+		for (const [name, length] of partesDoJogo) {
+			const response = await fetch(name);
+			if (!response.ok) throw new Error("Falha ao carregar o jogo. Recarregue a página.");
+			const data = new Uint8Array(await response.arrayBuffer());
+			if (data.length !== length) throw new Error("O download do jogo ficou incompleto.");
+			pack.set(data, offset);
+			offset += length;
+			onProgress(offset, size);
+		}
+		if (offset !== size) throw new Error("O pacote do jogo está incompleto.");
+	}
+	await Promise.all([engine.init(GODOT_CONFIG.executable), carregarPartes()]);
+	engine.copyToFS("index.pck", pack);
+	return engine.start({ args: ["--main-pack", "index.pck", ...GODOT_CONFIG.args] });
+}
+
 
 (function () {
 	const statusOverlay = document.getElementById('status');
@@ -199,7 +222,7 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
-		engine.startGame({
+		iniciarPocketAnimals({
 			'onProgress': function (current, total) {
 				if (current > 0 && total > 0) {
 					statusProgress.value = current;
